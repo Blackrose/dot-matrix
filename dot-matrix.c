@@ -93,7 +93,7 @@ int dot_arrange_type(arrange_type at,
         unsigned char*matrix_before, unsigned char*matrix_after)
 {
     int i, j;
-    unsigned char tmp[16][2];
+    unsigned char tmp[2][16];
     unsigned char matrix_ori[16][2];
 
     memcpy(matrix_ori, matrix_before, 32);
@@ -114,22 +114,41 @@ int dot_arrange_type(arrange_type at,
             }
             printf("\n");
         }
-
 #endif
+
+    if(at == COLUMN_ROW_TYPE){
+        // two bytes and 8 rows
         for(i = 1; i < 8; i++){
             for(j = 0; j < 8; j++){
                 tmp[0][i] |= (matrix_ori[i][0] & (0x1 << j));
             }
         }
 
+        // two bytes and anothre 8 rows
         for(i = 8; i < 16; i++){
             for(j = 0; j < 8; j++){
                 tmp[1][i] |= (matrix_ori[i][1] & (0x1 << j));
             }
         }
+    }else if(at == ROW_COLUMN_TYPE){
 
-        memcpy(matrix_after, tmp, FONT_BYTES);
+        // 16 rows and the first byte
+        for(i = 0; i < 16; i++)
+            for(j = 0; j < 8;j++)
+                tmp[0][i] |= (matrix_ori[i][0] & (0x1 << j));
 
+        // 16 rows and the second byte
+        for(i = 0; i < 16; i++)
+            for(j = 0; j < 8; j++)
+                tmp[1][i] |= (matrix_ori[i][1] & (0x1 << j));
+    }else if(at == PER_ROW_TYPE){
+        // Do nothing, because dot-matrix of the HZK16 file
+        // also use this type to store.
+    }else if(at == PER_COLUMN_TYPE){
+    
+    }
+
+    memcpy(matrix_after, tmp, FONT_BYTES);
 
 }
 
@@ -137,7 +156,7 @@ int display(char *incode, int len)
 {
         int i, j, bit;
         char matrix_real[16][2];
-        unsigned char font_map[16][2];
+        unsigned char font_map[2][16];
 
         memset(font_map, 0, FONT_BYTES);
 
