@@ -15,14 +15,6 @@ else
 CFLAGS= -g -Wall -D OS_LINUX
 endif
 
-ifeq ($(DAEMON), y)
-CFLAGS += -D HAVE_DAEMON
-endif
-
-ifeq ($(DEBUG), y)
-CFLAGS += -D HAVE_DEBUG
-endif
-
 ifeq ($(OS), MAC)
 LDFLAGS=
 else
