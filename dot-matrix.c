@@ -11,22 +11,31 @@ typedef enum
     PER_COLUMN_TYPE = 0x1,
     PER_ROW_TYPE,
     COLUMN_ROW_TYPE,
-    ROW_COLUMN_TYPE
+    ROW_COLUMN_TYPE,
 }arrange_type;
 
 int display(char *incode, int len);
 
+char buffer[16][16];
+
+#define UTF8_LEN 3
+//#define DEBUG
+
 int main(int argc, char* argv[])
 {
+#ifdef DEBUG
         char *in_word = "西";
-        iconv_t convert_fd;
         unsigned int inbuf_len = strlen(in_word);
-        //int inbuf_len = strlen(argv[1]);
-        char outbuf[OUTLEN];
         char *pin = in_word;
-        //char *pin = argv[1];
-        char *pout = &outbuf[0];  //if use "pout=&outbuf", this program received SIGSERV signal, it appear segmentfault
+#else
+        char *pin = argv[1];
+        unsigned int inbuf_len = strlen(argv[1]);
+#endif
+        iconv_t convert_fd;
+        char outbuf[OUTLEN];
+        char *pout = &outbuf[0]; 
         unsigned int outbuf_len = OUTLEN;
+        int i;
 
         memset(outbuf, 0, OUTLEN);
         printf("Originial Data:\n");
@@ -35,7 +44,7 @@ int main(int argc, char* argv[])
         printf("\tstrlen(outbuf)= %d\n", strlen(outbuf));
 
         // that word may be encoded by UTF-8, so convert it to GB2312
-        if(inbuf_len == 3){
+        if(inbuf_len == UTF8_LEN){
             convert_fd = iconv_open("GB2312", "UTF-8");
             if(convert_fd == 0)
                 return EXIT_FAILURE;
@@ -50,15 +59,14 @@ int main(int argc, char* argv[])
         printf("\tinbuf_len=%d, outbuf_len=%d\n", inbuf_len, outbuf_len);
         printf("\tstrlen(outbuf)= %d\n", strlen(outbuf));
 
-        int i;
         for(i = 0; i < strlen(outbuf); i += 2){
             display(outbuf+i, 2); //use HZK16 to display dot-matrix font in GB2312
         }
 
-        return EXIT_SUCCESS;
+        return 0;
 }
 
-int get_word_array(char *incode, int len, char*word_array)
+int get_word_array(char *incode, int len, char *word_array)
 {
 
     FILE *HZK=NULL;
@@ -67,8 +75,8 @@ int get_word_array(char *incode, int len, char*word_array)
 
     //get area code，chinese encoded start from 0xA1
     //get bit code，chinese encoded start from 0xA1
-    qh = incode[0] - 0xa0;    
-    wh = incode[1] - 0xa0;   
+    qh = incode[0] - 0xa0;
+    wh = incode[1] - 0xa0;
     
     //get offset position from HZK16 library when use chinese
     offset = (94*(qh - 1) + (wh - 1)) * 32;     
@@ -87,14 +95,16 @@ int get_word_array(char *incode, int len, char*word_array)
     
     fclose(HZK);
 
+    return 1;
 }
 
 int dot_arrange_type(arrange_type at, 
         unsigned char*matrix_before, unsigned char*matrix_after)
 {
-    int i, j;
+    int i, j, k;
     unsigned char tmp[2][16];
     unsigned char matrix_ori[16][2];
+    unsigned char temp[16][16];
 
     memcpy(matrix_ori, matrix_before, 32);
     memset(tmp, 0, 32);
@@ -115,7 +125,7 @@ int dot_arrange_type(arrange_type at,
             printf("\n");
         }
 #endif
-
+#if 0
     if(at == COLUMN_ROW_TYPE){
         // two bytes and 8 rows
         for(i = 1; i < 8; i++){
@@ -147,9 +157,36 @@ int dot_arrange_type(arrange_type at,
     }else if(at == PER_COLUMN_TYPE){
     
     }
+#endif
+
+    int byt;
+    for(k = 0; k < 16; k++){
+        byt = 0x0;
+        for(i = 0; i < 8; i++){
+            for(j = 0; j < 8; j++)
+                if(k < 8)
+                    byt |= (matrix_ori[j][0] & (1 << j));
+                else
+                    byt |= (matrix_ori[j][1] & (1 << j));
+        }
+        tmp[0][k] = byt;
+    }
+    
+    for(k = 0; k < 16; k++){
+        byt = 0x0;
+        for(i = 0; i < 8; i++){
+            for(j = 8; j < 16; j++)
+                if(k < 8)
+                    byt |= (matrix_ori[j][0] & (1 << j));
+                else
+                    byt |= (matrix_ori[j][1] & (1 << j));
+        }
+        tmp[1][k] = byt;
+    }
 
     memcpy(matrix_after, tmp, FONT_BYTES);
 
+    return 1;
 }
 
 int display(char *incode, int len)
@@ -161,9 +198,11 @@ int display(char *incode, int len)
         memset(font_map, 0, FONT_BYTES);
 
         get_word_array(incode, len, matrix_real);
-        printf("Dot-Matrix Size : 16x16\n");
 
-        //display dot-matrix
+        //display dot-matrix, it has 16 rows.
+        //Every row has two parts,each part has 8 bits
+        //It displayed from left to right
+        printf("Dot-Matrix Size : 16x16\n");
         for(i = 0; i < 16; i++){
             for(j = 0; j < 2; j++){
                 for(bit = 0; bit < 8; bit++){
@@ -177,7 +216,7 @@ int display(char *incode, int len)
             printf("\n");
         }
 
-        dot_arrange_type(COLUMN_ROW_TYPE, matrix_real, font_map);
+        dot_arrange_type(ROW_COLUMN_TYPE, matrix_real, font_map);
 
         for(i = 0;i < 2; i++){
             for(j = 0; j < 16; j++){
